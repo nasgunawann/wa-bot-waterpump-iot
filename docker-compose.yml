@@ -8,6 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: bot-server
     restart: unless-stopped
+    user: "1000:1000"  # Jalankan sebagai user non-root untuk keamanan
     ports:
       - "3000:3000"  # Internal network only (for Cloudflare tunnel)
     environment:
