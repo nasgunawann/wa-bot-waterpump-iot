@@ -370,12 +370,17 @@ server.listen(PORT, async () => {
   await startWhatsAppBot();
 });
 
-// Graceful shutdown handlers
-process.on('SIGINT', async () => {
+// Graceful shutdown function
+function gracefulShutdown() {
   console.log('\n🛑 Shutting down gracefully...');
   isShuttingDown = true;
   
   if (sock) {
+    // Remove event listeners BEFORE closing to prevent disconnect handler from running
+    sock.ev.removeAllListeners('connection.update');
+    sock.ev.removeAllListeners('messages.upsert');
+    sock.ev.removeAllListeners('creds.update');
+    log.info('✅ Auth session preserved');
     sock.end();
   }
   
@@ -386,28 +391,11 @@ process.on('SIGINT', async () => {
   
   // Force exit after 5s if not closed
   setTimeout(() => {
-    log.warn('Forced shutdown');
-    process.exit(0);
+    log.warn('Forced shutdown after timeout');
+    process.exit(1);
   }, 5000);
-});
+}
 
-// Handle Docker stop
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-  isShuttingDown = true;
-  
-  if (sock) {
-    sock.end();
-  }
-  
-  server.close(() => {
-    log.info('Server closed');
-    process.exit(0);
-  });
-  
-  // Force exit after 5s if not closed
-  setTimeout(() => {
-    log.warn('Forced shutdown');
-    process.exit(0);
-  }, 5000);
-});
+// Handle Ctrl+C and Docker stop
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
