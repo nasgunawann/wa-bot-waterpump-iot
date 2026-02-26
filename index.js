@@ -19,6 +19,7 @@ let sock, isConnected = false, esp32Client = null, currentChatContext = null, la
 const processedMessages = new Set();
 const MAX_PROCESSED_MESSAGES = 1000;
 let isReconnecting = false;
+let isShuttingDown = false;
 
 // ==================== COMMAND MAPPING ====================
 const COMMAND_MAP = {
@@ -118,8 +119,13 @@ async function startWhatsAppBot() {
       log.warn(`Disconnected: ${reason} (${statusCode})`);
       
       if (statusCode === DisconnectReason.loggedOut) {
-        log.error('Logged out! Session terminated.');
-        cleanupAuthSession();
+        // Only cleanup auth if not gracefully shutting down
+        if (!isShuttingDown) {
+          log.error('Logged out! Session terminated.');
+          cleanupAuthSession();
+        } else {
+          log.info('Graceful shutdown, preserving auth session.');
+        }
       } else if (statusCode === DisconnectReason.badSession) {
         log.error('Bad session detected! Cleaning up...');
         cleanupAuthSession();
@@ -364,8 +370,44 @@ server.listen(PORT, async () => {
   await startWhatsAppBot();
 });
 
+// Graceful shutdown handlers
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down...');
-  if (sock) await sock.logout();
-  process.exit(0);
+  console.log('\n🛑 Shutting down gracefully...');
+  isShuttingDown = true;
+  
+  if (sock) {
+    sock.end();
+  }
+  
+  server.close(() => {
+    log.info('Server closed');
+    process.exit(0);
+  });
+  
+  // Force exit after 5s if not closed
+  setTimeout(() => {
+    log.warn('Forced shutdown');
+    process.exit(0);
+  }, 5000);
+});
+
+// Handle Docker stop
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  isShuttingDown = true;
+  
+  if (sock) {
+    sock.end();
+  }
+  
+  server.close(() => {
+    log.info('Server closed');
+    process.exit(0);
+  });
+  
+  // Force exit after 5s if not closed
+  setTimeout(() => {
+    log.warn('Forced shutdown');
+    process.exit(0);
+  }, 5000);
 });
