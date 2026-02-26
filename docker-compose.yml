@@ -1,16 +1,10 @@
-version: '3.8'
-
 services:
-  # Bot Server - WhatsApp Bot untuk kontrol pompa
   bot-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: bot-server
     restart: unless-stopped
-    user: "1000:1000"  # Jalankan sebagai user non-root untuk keamanan
-    ports:
-      - "3000:3000"  # Internal network only (for Cloudflare tunnel)
+    # Menjalankan sebagai user 1000 agar sinkron dengan file system Fedora kamu
+    user: "1000:1000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -18,50 +12,26 @@ services:
       - GROUP_JID=${GROUP_JID}
       - MESSAGE_TEXT=${MESSAGE_TEXT:-Sensor tersentuh!}
       - API_KEY=${API_KEY}
-      - ALLOWED_IPS=${ALLOWED_IPS:-127.0.0.1,172.17.0.0/16}
     volumes:
-      # Persist WhatsApp session across restarts
+      # Sesi WA tersimpan permanen di folder lokal
       - ./auth_info_baileys:/app/auth_info_baileys
     networks:
       - bot-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/status', (res) => { if (res.statusCode !== 200) throw new Error(res.statusCode) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
-  # Cloudflare Tunnel - Secure public access
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: bot-server-tunnel
     restart: unless-stopped
-    command: tunnel run
+    # Update: Menggunakan tunnel run tanpa --no-autoupdate jika di VPS
+    command: tunnel --no-autoupdate run
     environment:
-      - CLOUDFLARE_TOKEN=${CLOUDFLARE_TOKEN}
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
     networks:
       - bot-network
     depends_on:
-      - bot-server
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
+      bot-server:
+        condition: service_healthy
 
-# Internal network (bot-server tidak expose ke host, hanya via tunnel)
 networks:
   bot-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-
-# Named volume for persistence
-volumes:
-  auth_info_baileys:
+    name: iot_shared_network

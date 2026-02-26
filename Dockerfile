@@ -1,45 +1,33 @@
 # Build stage
-FROM node:20-alpine as builder
-
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
+# Menggunakan --omit=dev sesuai standar NPM terbaru 2026
+RUN npm ci --omit=dev
 
 # Final stage
 FROM node:20-alpine
-
-# Install dumb-init for proper signal handling
+# Update: dumb-init di Alpine 3.x ada di /usr/bin/
 RUN apk add --no-cache dumb-init
-
 WORKDIR /app
 
-# Create auth directory (for WhatsApp session persistence)
-RUN mkdir -p auth_info_baileys
+# Buat folder auth dan set ownership ke user 1000 (Nasgun)
+# Ini penting supaya Baileys bisa simpan file sesi WA
+RUN mkdir -p auth_info_baileys && chown -R 1000:1000 /app
 
-# Copy node_modules from builder
 COPY --from=builder /app/node_modules ./node_modules
-
-# Copy application files
 COPY package*.json ./
 COPY index.js ./
 
-# Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/status', (res) => { if (res.statusCode !== 200) throw new Error(res.statusCode) })"
+# Healthcheck menggunakan path internal
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/status', (res) => { if (res.statusCode !== 200) process.exit(1) })"
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["/sbin/dumb-init", "--"]
-
-# Start application
+# FIX: Gunakan path yang benar untuk dumb-init
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["node", "index.js"]
 
-# Expose port (internal only, not for direct internet access)
 EXPOSE 3000
