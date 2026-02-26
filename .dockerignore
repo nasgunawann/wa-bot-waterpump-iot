@@ -1,0 +1,45 @@
+# Dependencies (install fresh in container)
+node_modules
+npm-debug.log
+yarn-error.log
+
+# WhatsApp session data (mount as volume instead)
+auth_info_baileys
+
+# Environment files (pass via .env)
+.env
+.env.local
+.env.*.local
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE & Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & Coverage
+coverage
+.nyc_output
+test
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (not needed in image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+setup-cloudflare.sh
