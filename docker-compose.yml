@@ -14,7 +14,7 @@ services:
       - API_KEY=${API_KEY}
     volumes:
       # Sesi WA tersimpan permanen di folder lokal
-      - ./auth_info_baileys:/app/auth_info_baileys
+      - ./auth_info_baileys:/app/auth_info_baileys:z
     networks:
       - bot-network
 
