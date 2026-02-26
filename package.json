@@ -1,0 +1,21 @@
+{
+  "name": "bot-server",
+  "version": "1.0.0",
+  "description": "WhatsApp notification server for ESP32 touch sensor",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["whatsapp", "baileys", "esp32", "iot", "notification"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.8",
+    "express": "^4.19.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.3",
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0"
+  }
+}
