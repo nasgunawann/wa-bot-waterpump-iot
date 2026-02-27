@@ -17,6 +17,7 @@ const AUTH_FOLDER = 'auth_info_baileys';
 // ==================== STATE ====================
 let sock, isConnected = false, esp32Client = null, currentChatContext = null, latestQR = null;
 let esp32Ip = null;
+let esp32LocalIp = null;
 const processedMessages = new Set();
 const MAX_PROCESSED_MESSAGES = 1000;
 let isReconnecting = false;
@@ -231,10 +232,13 @@ async function sendConfirmation(command, pumpState, additionalData = {}) {
       const waterLevel = additionalData.waterLevel || 0;
       const safetyMode = additionalData.safetyMode || false;
       const threshold = additionalData.threshold || 3000;
+      const reportedLocalIp = additionalData.ipLocal || esp32LocalIp || null;
       const isFull = waterLevel < threshold;
       const statusEmoji = isFull ? '✅' : '⭕';
       const statusText = isFull ? 'PENUH' : 'BELUM PENUH';
-      const ipText = esp32Ip ? `\n\n📡 ESP32 IP: ${esp32Ip}` : '';
+      const ipText = reportedLocalIp
+        ? `\n\n📡 ESP32 IP: ${reportedLocalIp}`
+        : (esp32Ip ? `\n\n📡 ESP32 IP: ${esp32Ip}` : '');
       
       message = `📊 *STATUS SISTEM*\n\n` +
         `💧 Pompa: ${pumpState ? '⚡ HIDUP' : '🛑 MATI'}\n` +
@@ -267,7 +271,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 wss.on('connection', (ws) => {
   log.success('ESP32 connected');
   esp32Client = ws;
-  esp32Ip = normalizeIp(ws?._socket?.remoteAddress);
+  esp32Ip = null;
 
   ws.on('message', async (data) => {
     try {
@@ -280,8 +284,12 @@ wss.on('connection', (ws) => {
           waterLevel: msg.waterLevel || 0,
           safetyMode: msg.safetyMode || false,
           threshold: msg.threshold || 3000,
-          relayState: msg.relayState
+          relayState: msg.relayState,
+          ipLocal: msg.ipLocal || null
         };
+        if (msg.ipLocal) {
+          esp32LocalIp = msg.ipLocal;
+        }
         await sendConfirmation(msg.command, msg.pumpState, additionalData);
       } 
       else if (msg.type === 'water_full') {
@@ -321,6 +329,7 @@ wss.on('connection', (ws) => {
     esp32Client = null;
     currentChatContext = null;
     esp32Ip = null;
+    esp32LocalIp = null;
   });
 });
 
