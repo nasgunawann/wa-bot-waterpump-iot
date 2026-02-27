@@ -16,6 +16,7 @@ const AUTH_FOLDER = 'auth_info_baileys';
 
 // ==================== STATE ====================
 let sock, isConnected = false, esp32Client = null, currentChatContext = null, latestQR = null;
+let esp32Ip = null;
 const processedMessages = new Set();
 const MAX_PROCESSED_MESSAGES = 1000;
 let isReconnecting = false;
@@ -67,6 +68,11 @@ function parseCommand(text) {
 
 function renderHTML(title, body, autoRefresh = false) {
   return `<!DOCTYPE html><html><head><title>${title}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial;text-align:center;padding:50px;background:#f0f0f0}h1{color:#25D366}img{max-width:400px;border:5px solid #25D366;border-radius:10px;background:#fff;padding:20px}.info{background:#fff;padding:20px;margin:20px auto;max-width:500px;border-radius:10px}ol{text-align:left}</style>${autoRefresh ? '<script>setTimeout(()=>location.reload(),5000)</script>' : ''}</head><body>${body}</body></html>`;
+}
+
+function normalizeIp(address) {
+  if (!address) return null;
+  return address.startsWith('::ffff:') ? address.slice(7) : address;
 }
 
 // ==================== WHATSAPP BOT ====================
@@ -228,6 +234,7 @@ async function sendConfirmation(command, pumpState, additionalData = {}) {
       const isFull = waterLevel < threshold;
       const statusEmoji = isFull ? '✅' : '⭕';
       const statusText = isFull ? 'PENUH' : 'BELUM PENUH';
+      const ipText = esp32Ip ? `\n\n📡 ESP32 IP: ${esp32Ip}` : '';
       
       message = `📊 *STATUS SISTEM*\n\n` +
         `💧 Pompa: ${pumpState ? '⚡ HIDUP' : '🛑 MATI'}\n` +
@@ -235,7 +242,8 @@ async function sendConfirmation(command, pumpState, additionalData = {}) {
         `💧 *Sensor Air*\n` +
         `  Threshold: ${threshold}\n` +
         `  Level: ${waterLevel} / 4095\n` +
-        `  Status: ${statusEmoji} ${statusText}`;
+        `  Status: ${statusEmoji} ${statusText}` +
+        ipText;
     } else {
       // Generic reply untuk command lainnya
       const msgTemplate = REPLY_MESSAGES[command];
@@ -259,6 +267,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 wss.on('connection', (ws) => {
   log.success('ESP32 connected');
   esp32Client = ws;
+  esp32Ip = normalizeIp(ws?._socket?.remoteAddress);
 
   ws.on('message', async (data) => {
     try {
@@ -311,6 +320,7 @@ wss.on('connection', (ws) => {
     log.error('ESP32 disconnected');
     esp32Client = null;
     currentChatContext = null;
+    esp32Ip = null;
   });
 });
 
